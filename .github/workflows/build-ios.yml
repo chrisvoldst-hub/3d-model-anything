@@ -1,33 +1,71 @@
+Claude
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Build ios
+ · 
+YML
 # Bygger iPhone-appen (HouseCapture) på en Mac i GitHubs sky
 # og lager en usignert .ipa-fil som du installerer med Sideloadly.
 # Legg denne filen i din fork som: .github/workflows/build-ios.yml
 name: Bygg iPhone-app (IPA)
-
+ 
 on:
   workflow_dispatch:   # kjøres manuelt fra Actions-fanen
-
+ 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Hent koden
         uses: actions/checkout@v4
-
-      - name: Velg nyeste stabile Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Vis Xcode-versjon
-        run: xcodebuild -version
-
+ 
+      - name: Velg nyeste Xcode (prosjektet krever iOS 26-SDK eller nyere)
+        run: |
+          echo "Installerte Xcode-versjoner:"; ls -d /Applications/Xcode*.app
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Velger: $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
+ 
       - name: Installer XcodeGen
         run: brew install xcodegen
-
+ 
       - name: Lag Xcode-prosjektet
         working-directory: apps/house-capture
         run: xcodegen generate
-
+ 
       - name: Bygg appen (uten signering)
         working-directory: apps/house-capture
         run: |
@@ -39,8 +77,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
-
+            build 2>&1 | tee build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            echo "================ FEILMELDINGER ================"
+            grep -E "error:" build.log | sort -u | head -40
+            exit $STATUS
+          fi
+ 
       - name: Pakk som .ipa
         working-directory: apps/house-capture
         run: |
@@ -48,10 +92,12 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/HouseCapture.app Payload/
           zip -qry HouseCapture.ipa Payload
           ls -lh HouseCapture.ipa
-
+ 
       - name: Last opp .ipa
         uses: actions/upload-artifact@v4
         with:
           name: HouseCapture-ipa
           path: apps/house-capture/HouseCapture.ipa
           retention-days: 30
+ 
+Claude finished the response
